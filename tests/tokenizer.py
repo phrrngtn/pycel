@@ -1,6 +1,6 @@
 # converted from if __name__ == '__main__' part of pycel.tokenzizer
 
-from pycel.excelcompiler import shunting_yard
+from pycel.tokenizer import shunting_yard
 
 def stringify(e):
     return "|".join([str(x) for x in e])

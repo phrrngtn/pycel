@@ -24,6 +24,11 @@
 import re
 import collections
 
+from .ast import (
+    Operator,
+    create_node,
+)
+
 #========================================================================
 #       Class: ExcelParserTokens
 # Description: Inheritable container for token definitions
@@ -564,53 +569,13 @@ class ExcelParser(ExcelParserTokens):
                     indent += 1;
         return output
 
-class Operator:
-    def __init__(self,value,precedence,associativity):
-        self.value = value
-        self.precedence = precedence
-        self.associativity = associativity
-
-class ASTNode(object):
-    def __init__(self,token):
-        super(ASTNode,self).__init__()
-        self.token = token
-    def emit(self):
-        self.token.tvalue
-    def __str__(self):
-        return self.token.tvalue
-    
-class OperatorNode(ASTNode):
-    def __init__(self,*args):
-        super(OperatorNode,self).__init__(*args)
-    def emit(self):
-        pass
-
-class RangeNode(ASTNode):
-    def __init__(self,*args):
-        super(RangeNode,self).__init__(*args)
-    def emit(self):
-        pass
-    
-class FunctionNode(ASTNode):
-    def __init__(self,*args):
-        super(FunctionNode,self).__init__(*args)
-        self.num_args = 0
-        
-    def emit(self):
-        pass
-
-def create_node(t):
-    if t.ttype == "operand" and t.tsubtype == "range":
-        return RangeNode(t)
-    elif t.ttype == "function":
-        return FunctionNode(t)
-    elif t.ttype == "operator":
-        return OperatorNode(t)
-    else:
-        return ASTNode(t)
-
 def shunting_yard(expression):
+    """
+    Tokenize an excel formula expression into reverse polish notation
     
+    Core algorithm taken from wikipedia with varargs extensions from
+    http://www.kallisti.net.nz/blog/2008/02/extension-to-the-shunting-yard-algorithm-to-allow-variable-numbers-of-arguments-to-functions/
+    """
     #remove leading =
     if expression.startswith('='):
         expression = expression[1:]
@@ -618,7 +583,7 @@ def shunting_yard(expression):
     p = ExcelParser();
     p.parse(expression)
 
-    # insert tokens for '(' and ')', to make things cleaner below
+    # insert tokens for '(' and ')', to make things clearer below
     tokens = []
     for t in p.tokens.items:
         if t.ttype == "function" and t.tsubtype == "start":
@@ -626,8 +591,6 @@ def shunting_yard(expression):
             tokens.append(t)
             tokens.append(f_token('(','arglist','start'))
         elif t.ttype == "function" and t.tsubtype == "stop":
-            #t.tsubtype = ""
-            #tokens.append(t)
             tokens.append(f_token(')','arglist','stop'))
         elif t.ttype == "subexpression" and t.tsubtype == "start":
             t.tvalue = '('
@@ -638,7 +601,7 @@ def shunting_yard(expression):
         else:
             tokens.append(t)
 
-    print "tokens: ", "|".join([x.tvalue for x in tokens])
+    #print "tokens: ", "|".join([x.tvalue for x in tokens])
 
     #http://office.microsoft.com/en-us/excel-help/calculation-operators-and-precedence-HP010078886.aspx
     operators = {}
@@ -665,21 +628,16 @@ def shunting_yard(expression):
     were_values = []
     arg_count = []
     
-    def po():
-        print "output: ", "|".join([x.tvalue for x in output])
-    def so():
-        print "stack:", "|".join([x.tvalue for x in stack])
-    
     for t in tokens:
         if t.ttype == "operand":
-            
-            output.append(create_node(t))
 
+            output.append(create_node(t))
             if were_values:
                 were_values.pop()
                 were_values.append(True)
                 
         elif t.ttype == "function":
+
             stack.append(t)
             arg_count.append(0)
             if were_values:
@@ -699,12 +657,12 @@ def shunting_yard(expression):
                 raise Exception("Mismatched or misplaced parentheses")
         
         elif t.ttype.startswith('operator'):
+
             if t.ttype.endswith('-prefix') and t.tvalue =="-":
                 o1 = operators['u-']
             else:
                 o1 = operators[t.tvalue]
 
-                
             while stack and stack[-1].ttype.startswith('operator'):
                 
                 if stack[-1].ttype.endswith('-prefix') and stack[-1].tvalue =="-":
@@ -741,7 +699,7 @@ def shunting_yard(expression):
                 w = were_values.pop()
                 if w: a += 1
                 f.num_args = a
-                print f, "has ",a," args"
+                #print f, "has ",a," args"
                 output.append(f)
 
     while stack:
@@ -752,4 +710,8 @@ def shunting_yard(expression):
 
     #print "Stack is: ", "|".join(stack)
     #print "Ouput is: ", "|".join([x.tvalue for x in output])
-    return output
+    
+    # convert to list
+    result = [x for x in output]
+    return result
+   

@@ -1,0 +1,10 @@
+*.py text=auto
+*.sql text=auto
+*.yml text=auto
+*.yaml text=auto
+*.rst text=auto
+*.sln text eol=crlf
+*.rdl text eol=crlf
+*.mdb binary
+*.accdb binary
+*.zip binary
